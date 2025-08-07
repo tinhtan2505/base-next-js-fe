@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "../globals.css";
-import ClientAuthWrapper from "../modules/auth/ClientAuthWrapper";
-import MainLayout from "../modules/main-layout";
-
+import LayoutClient from "./layout-client";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -27,12 +25,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white text-black invisible`}
         cz-shortcut-listen="true"
       >
-        <MainLayout>
-          <ClientAuthWrapper>{children}</ClientAuthWrapper>
-        </MainLayout>
+        <LayoutClient>{children}</LayoutClient>
       </body>
     </html>
   );
