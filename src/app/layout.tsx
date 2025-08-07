@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Suspense } from "react";
-import ClientAuthWrapper from "./auth/ClientAuthWrapper";
+import ClientAuthWrapper from "./modules/auth/ClientAuthWrapper";
+import MainLayout from "./modules/main-layout";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,9 +30,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         cz-shortcut-listen="true"
       >
-        <Suspense fallback={null}>
+        <MainLayout>
           <ClientAuthWrapper>{children}</ClientAuthWrapper>
-        </Suspense>
+        </MainLayout>
       </body>
     </html>
   );

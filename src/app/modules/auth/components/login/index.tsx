@@ -1,9 +1,8 @@
-"use client";
-import { Button, Checkbox, Form, Input, message } from "antd";
-import React from "react";
-import { login } from "../lib/api-service";
-import { isAuthenticated } from "../utils/auth";
-import { useRouter } from "next/navigation";
+'use client';
+import { Button, Checkbox, Form, Input, message } from 'antd';
+import React from 'react';
+import { useRouter } from 'next/navigation';
+import { isAuthenticated, login } from '../../lib/auth';
 
 const Login: React.FC<object> = ({}) => {
   const router = useRouter();
@@ -17,10 +16,10 @@ const Login: React.FC<object> = ({}) => {
   const onFinish = async (values: LoginFormValues) => {
     await login(values.username, values.password);
     if (isAuthenticated()) {
-      message.success("Đăng nhập thành công!");
-      router.push("/"); // <-- chuyển hướng
+      message.success('Đăng nhập thành công!');
+      router.push('/'); // <-- chuyển hướng
     } else {
-      message.error("Đăng nhập thất bại!");
+      message.error('Đăng nhập thất bại!');
     }
   };
 
@@ -42,7 +41,7 @@ const Login: React.FC<object> = ({}) => {
           <Form.Item
             label="UserName"
             name="username"
-            rules={[{ required: true, message: "Please input your username!" }]}
+            rules={[{ required: true, message: 'Please input your username!' }]}
           >
             <Input placeholder="Type your username address" />
           </Form.Item>
@@ -50,7 +49,7 @@ const Login: React.FC<object> = ({}) => {
           <Form.Item
             label="Password"
             name="password"
-            rules={[{ required: true, message: "Please input your password!" }]}
+            rules={[{ required: true, message: 'Please input your password!' }]}
           >
             <Input.Password placeholder="Type your password" />
           </Form.Item>

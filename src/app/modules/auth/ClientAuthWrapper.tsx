@@ -3,7 +3,7 @@
 
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { isAuthenticated } from "../utils/auth";
+import { isAuthenticated } from "./lib/auth";
 
 export default function ClientAuthWrapper({
   children,

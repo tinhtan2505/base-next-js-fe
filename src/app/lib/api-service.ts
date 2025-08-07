@@ -1,24 +1,27 @@
-const domain = "http://localhost:8080/";
+const domain = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-export const login = async (username: string, password: string) => {
+export function post(
+  urlSlug: string,
+  data: unknown,
+  controller?: AbortController
+) {
+  const token = localStorage.getItem('token');
+
   const headers: HeadersInit = {
-    "Content-Type": "application/json",
+    'Content-Type': 'application/json',
   };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  console.log('data', data);
 
   const requestOptions: RequestInit = {
-    method: "POST",
+    method: 'POST',
     headers: new Headers(headers),
-    body: JSON.stringify({ username: username, password: password }),
+    body: JSON.stringify(data),
+    signal: controller?.signal,
   };
 
-  const response = await fetch(domain + "api/auth/login", requestOptions);
-  const statusCode = response.status;
-  const data = await response.json();
-
-  if (statusCode === 200) {
-    localStorage.setItem("token", data.token);
-    return data;
-  } else {
-    throw new Error("Đăng nhập thất bại");
-  }
-};
+  return fetch(domain + urlSlug, requestOptions);
+}
