@@ -1,10 +1,13 @@
-'use client';
-import React from 'react';
-import { Layout, Menu, Button } from 'antd';
-import { LogoutOutlined, HomeOutlined, BankOutlined } from '@ant-design/icons';
-import { usePathname, useRouter } from 'next/navigation';
-import { MenuInfo } from 'rc-menu/lib/interface';
-import { logout } from './auth/lib/auth';
+"use client";
+import React from "react";
+import { Layout, Menu, Button } from "antd";
+import { LogoutOutlined } from "@ant-design/icons";
+import { usePathname, useRouter } from "next/navigation";
+import { MenuInfo } from "rc-menu/lib/interface";
+
+import { logout } from "./auth/lib/auth";
+import { MENU } from "../config/menu.config";
+import { buildAntdItems, findBestMatch } from "../config/menu.utils";
 
 const { Header, Sider, Content } = Layout;
 
@@ -12,26 +15,19 @@ interface MainLayoutProps {
   children: React.ReactNode;
 }
 
-const menuItems = [
-  {
-    key: '/',
-    icon: <HomeOutlined />,
-    label: 'Home',
-  },
-  {
-    key: '/payment-listener',
-    icon: <BankOutlined />,
-    label: 'Payment Listener',
-  },
-];
-
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const router = useRouter();
   const pathname = usePathname();
 
+  // Sinh items cho antd Menu từ cấu hình gốc
+  const menuItems = buildAntdItems(MENU);
+
+  // Tìm item đang active + parents để mở submenu
+  const { key: activeKey, parents } = findBestMatch(pathname, MENU);
+
   const handleLogout = async () => {
     await logout();
-    window.location.href = '/login';
+    window.location.href = "/login";
   };
 
   const handleMenuClick = (e: MenuInfo) => {
@@ -47,8 +43,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
         <Menu
           mode="inline"
-          selectedKeys={[pathname]}
           items={menuItems}
+          selectedKeys={activeKey ? [activeKey] : []}
+          defaultOpenKeys={parents}
           className="h-full"
           onClick={handleMenuClick}
         />
