@@ -15,12 +15,20 @@ const Login: React.FC<object> = ({}) => {
   }
 
   const onFinish = async (values: LoginFormValues) => {
-    await login(values.username, values.password);
-    if (await isAuthenticated()) {
-      message.success("Đăng nhập thành công!");
-      router.push("/"); // <-- chuyển hướng
-    } else {
-      message.error("Đăng nhập thất bại!");
+    try {
+      await login(values.username, values.password);
+      if (await isAuthenticated()) {
+        message.success("Đăng nhập thành công!");
+        router.push("/");
+      } else {
+        message.error("Đăng nhập thất bại!");
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        message.error(error.message || "Có lỗi xảy ra!");
+      } else {
+        message.error("Có lỗi xảy ra!");
+      }
     }
   };
 

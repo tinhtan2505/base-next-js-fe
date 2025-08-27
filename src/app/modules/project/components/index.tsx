@@ -795,7 +795,7 @@ const ProjectPage: React.FC = () => {
       </Card>
 
       {/* Table */}
-      <Card bodyStyle={{ padding: 0 }}>
+      <Card styles={{ body: { padding: 0 } }}>
         <Table<Project>
           rowKey="id"
           size="middle"

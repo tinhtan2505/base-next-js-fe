@@ -14,7 +14,8 @@ export const login = async (username: string, password: string) => {
     localStorage.setItem("token", data.token); // Lưu token vào localStorage
     return data;
   } else {
-    throw new Error("Đăng nhập thất bại");
+    const errorMessage = data?.message || "Đăng nhập thất bại";
+    throw new Error(errorMessage);
   }
 };
 
