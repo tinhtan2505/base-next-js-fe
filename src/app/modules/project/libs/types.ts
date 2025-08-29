@@ -16,32 +16,21 @@ export type Project = {
   updatedAt: string; // ISO
 };
 
-export const STATUS_META: Record<
-  ProjectStatus,
-  { label: string; color: string; bg: string; text: string }
-> = {
-  planning: {
-    label: "Planning",
-    color: "default",
-    bg: "bg-gray-100",
-    text: "text-gray-700",
-  },
-  active: {
-    label: "Active",
-    color: "green",
-    bg: "bg-green-50",
-    text: "text-green-700",
-  },
-  paused: {
-    label: "Paused",
-    color: "orange",
-    bg: "bg-orange-50",
-    text: "text-orange-700",
-  },
-  done: {
-    label: "Done",
-    color: "blue",
-    bg: "bg-blue-50",
-    text: "text-blue-700",
-  },
+export type CustomResponse<T> = {
+  status: number;
+  message: string;
+  data: T;
+};
+
+export type ProjectCreateRequest = {
+  code: string;
+  name: string;
+  owner: string;
+  status: ProjectStatus;
+  startDate: string;
+  dueDate?: string;
+  budget?: number;
+  progress?: number;
+  tags?: string[];
+  description?: string;
 };

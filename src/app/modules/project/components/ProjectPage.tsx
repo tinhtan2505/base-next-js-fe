@@ -16,6 +16,10 @@ import { StatsCards } from "./StatsCards";
 import { FiltersBar } from "./FiltersBar";
 import { ProjectTable } from "./ProjectTable";
 import ProjectFormDrawer from "./ProjectFormDrawer";
+import {
+  useCreateProjectMutation,
+  useGetProjectsQuery,
+} from "../data/project.api";
 
 // --- seed demo data giống bản gốc ---
 const uid = () =>
@@ -72,6 +76,8 @@ const seedData = (): Project[] => [
 ];
 
 const ProjectPage: React.FC = () => {
+  const { data: projects = [], isFetching, refetch } = useGetProjectsQuery();
+  const [createProject, { isLoading: isCreating }] = useCreateProjectMutation();
   const [data, setData] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -117,15 +123,27 @@ const ProjectPage: React.FC = () => {
   };
 
   // CRUD Handlers
-  const handleCreate = (
+  const handleCreate = async (
     vals: Omit<Project, "id" | "createdAt" | "updatedAt">
   ) => {
-    const created = db.create(vals);
-    setData((prev) =>
-      [created, ...prev].sort(
-        (a, b) => dayjs(b.updatedAt).valueOf() - dayjs(a.updatedAt).valueOf()
-      )
-    );
+    // const created = db.create(vals);
+    // setData((prev) =>
+    //   [created, ...prev].sort(
+    //     (a, b) => dayjs(b.updatedAt).valueOf() - dayjs(a.updatedAt).valueOf()
+    //   )
+    // );
+    await createProject({
+      code: vals.code,
+      name: vals.name,
+      owner: vals.owner,
+      status: vals.status,
+      startDate: vals.startDate,
+      dueDate: vals.dueDate,
+      budget: vals.budget,
+      progress: vals.progress,
+      tags: vals.tags,
+      description: vals.description,
+    }).unwrap();
     setDrawerOpen(false);
     message.success("Tạo dự án thành công");
   };
@@ -211,7 +229,7 @@ const ProjectPage: React.FC = () => {
   }, [filtered]);
 
   return (
-    <div className="p-5 max-w-[1400px] mx-auto">
+    <div className="p-2 h-full">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-4">
         <div>

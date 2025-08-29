@@ -87,7 +87,7 @@ const ProjectFormDrawer: React.FC<Props> = ({
       open={open}
       onClose={onClose}
       width={560}
-      destroyOnClose
+      destroyOnHidden
       extra={
         <Space>
           <Button onClick={onClose}>Hủy</Button>
