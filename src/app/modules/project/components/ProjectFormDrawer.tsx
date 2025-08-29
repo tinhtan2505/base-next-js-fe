@@ -13,7 +13,7 @@ import {
 import { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import React, { useEffect } from "react";
-import { Project, ProjectStatus } from "../libs/types";
+import { Project, ProjectStatus, ProjectStatusEnum } from "../libs/types";
 
 interface Props {
   open: boolean;
@@ -71,7 +71,7 @@ const ProjectFormDrawer: React.FC<Props> = ({
       code: vals.code?.trim() ?? "",
       name: vals.name?.trim() ?? "",
       owner: vals.owner?.trim() ?? "",
-      status: vals.status ?? "planning",
+      status: vals.status ?? ProjectStatusEnum.PLANNING,
       startDate: start ? start.toISOString() : dayjs().toISOString(),
       dueDate: due ? due.toISOString() : undefined,
       budget: vals.budget ? Number(vals.budget) : undefined,

@@ -9,7 +9,7 @@ import {
   ReloadOutlined,
 } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
-import { Project, ProjectStatus } from "../libs/types";
+import { Project, ProjectStatus, ProjectStatusEnum } from "../libs/types";
 import { db } from "../libs/db";
 import { exportProjectsCsv } from "../libs/csv";
 import { StatsCards } from "./StatsCards";
@@ -33,7 +33,7 @@ const seedData = (): Project[] => [
     code: "PRJ-001",
     name: "Hệ thống Thanh toán QR",
     owner: "Nguyễn Văn A",
-    status: "active",
+    status: ProjectStatusEnum.ACTIVE,
     startDate: dayjs().subtract(30, "day").toISOString(),
     dueDate: dayjs().add(30, "day").toISOString(),
     budget: 500_000_000,
@@ -48,7 +48,7 @@ const seedData = (): Project[] => [
     code: "PRJ-002",
     name: "CMS Bệnh viện",
     owner: "Trần Thị B",
-    status: "planning",
+    status: ProjectStatusEnum.PLANNING,
     startDate: dayjs().toISOString(),
     dueDate: dayjs().add(90, "day").toISOString(),
     budget: 300_000_000,
@@ -63,7 +63,7 @@ const seedData = (): Project[] => [
     code: "PRJ-003",
     name: "Data Warehouse v2",
     owner: "Phạm C",
-    status: "paused",
+    status: ProjectStatusEnum.PAUSED,
     startDate: dayjs().subtract(120, "day").toISOString(),
     dueDate: dayjs().add(10, "day").toISOString(),
     budget: 1_200_000_000,
@@ -132,11 +132,24 @@ const ProjectPage: React.FC = () => {
     //     (a, b) => dayjs(b.updatedAt).valueOf() - dayjs(a.updatedAt).valueOf()
     //   )
     // );
+    console.log("Creating", vals);
+    const STR2ENUM: Record<string, ProjectStatusEnum> = {
+      planning: ProjectStatusEnum.PLANNING,
+      active: ProjectStatusEnum.ACTIVE,
+      paused: ProjectStatusEnum.PAUSED,
+      done: ProjectStatusEnum.DONE,
+    };
+    const statusCode: ProjectStatusEnum =
+      typeof vals.status === "number"
+        ? (vals.status as ProjectStatusEnum)
+        : STR2ENUM[String(vals.status).toLowerCase()] ??
+          ProjectStatusEnum.PLANNING;
+
     await createProject({
       code: vals.code,
       name: vals.name,
       owner: vals.owner,
-      status: vals.status,
+      status: statusCode,
       startDate: vals.startDate,
       dueDate: vals.dueDate,
       budget: vals.budget,
@@ -220,8 +233,12 @@ const ProjectPage: React.FC = () => {
 
   const stats = useMemo(() => {
     const total = filtered.length;
-    const active = filtered.filter((x) => x.status === "active").length;
-    const done = filtered.filter((x) => x.status === "done").length;
+    const active = filtered.filter(
+      (x) => x.status === ProjectStatusEnum.ACTIVE
+    ).length;
+    const done = filtered.filter(
+      (x) => x.status === ProjectStatusEnum.DONE
+    ).length;
     const avgProgress = Math.round(
       filtered.reduce((acc, cur) => acc + (cur.progress || 0), 0) / (total || 1)
     );

@@ -42,8 +42,6 @@ export const projectApi = rootApi.injectEndpoints({
             draft.unshift({
               ...newItem,
               id: "temp-" + Math.random().toString(36).slice(2),
-              createdAt: dayjs().toISOString(),
-              updatedAt: dayjs().toISOString(),
             } as Project);
           })
         );

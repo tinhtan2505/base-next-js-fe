@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "../globals.css";
 import LayoutClient from "./layout-client";
 import AntdReact19Patch from "../AntdReact19Patch";
+import ReduxProvider from "../store/ReduxProvider";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -30,8 +31,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white text-black invisible`}
         cz-shortcut-listen="true"
       >
-        <AntdReact19Patch />
-        <LayoutClient>{children}</LayoutClient>
+        <ReduxProvider>
+          <AntdReact19Patch />
+          <LayoutClient>{children}</LayoutClient>{" "}
+        </ReduxProvider>
       </body>
     </html>
   );

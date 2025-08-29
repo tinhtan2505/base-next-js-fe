@@ -4,7 +4,12 @@ import { Button, Empty, Popconfirm, Space, Table, Tag, Tooltip } from "antd";
 import { ColumnsType, TableProps } from "antd/es/table";
 import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { Project, ProjectStatus, STATUS_META } from "../libs/types";
+import {
+  Project,
+  ProjectStatus,
+  ProjectStatusEnum,
+  STATUS_META,
+} from "../libs/types";
 
 interface Props {
   data: Project[];
@@ -48,11 +53,22 @@ export const ProjectTable: React.FC<Props> = ({
       {
         title: "Trạng thái",
         dataIndex: "status",
-        render: (v: ProjectStatus) => (
-          <Tag color={STATUS_META[v].color as string}>
-            {STATUS_META[v].label}
-          </Tag>
-        ),
+        render: (v: ProjectStatus) => {
+          const STR2ENUM: Record<string, ProjectStatusEnum> = {
+            planning: ProjectStatusEnum.PLANNING,
+            active: ProjectStatusEnum.ACTIVE,
+            paused: ProjectStatusEnum.PAUSED,
+            done: ProjectStatusEnum.DONE,
+          };
+
+          const key =
+            typeof v === "number"
+              ? v
+              : STR2ENUM[String(v).toLowerCase()] ?? ProjectStatusEnum.PLANNING;
+
+          const meta = STATUS_META[key];
+          return <Tag color={meta?.color}>{meta?.label}</Tag>;
+        },
       },
       {
         title: "Bắt đầu",
