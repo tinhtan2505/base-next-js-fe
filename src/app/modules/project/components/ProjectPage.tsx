@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Button, Card, Modal, Space, Tooltip, Typography, message } from "antd";
 import {
   ExclamationCircleOutlined,
@@ -10,7 +10,6 @@ import {
 } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
 import { Project, ProjectStatus, ProjectStatusEnum } from "../libs/types";
-import { db } from "../libs/db";
 import { exportProjectsCsv } from "../libs/csv";
 import { StatsCards } from "./StatsCards";
 import { FiltersBar } from "./FiltersBar";
@@ -18,68 +17,17 @@ import { ProjectTable } from "./ProjectTable";
 import ProjectFormDrawer from "./ProjectFormDrawer";
 import {
   useCreateProjectMutation,
+  useDeleteProjectMutation,
   useGetProjectsQuery,
+  useUpdateProjectMutation,
 } from "../data/project.api";
-
-// --- seed demo data giống bản gốc ---
-const uid = () =>
-  typeof crypto !== "undefined" && crypto.randomUUID
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2);
-
-const seedData = (): Project[] => [
-  {
-    id: uid(),
-    code: "PRJ-001",
-    name: "Hệ thống Thanh toán QR",
-    owner: "Nguyễn Văn A",
-    status: ProjectStatusEnum.ACTIVE,
-    startDate: dayjs().subtract(30, "day").toISOString(),
-    dueDate: dayjs().add(30, "day").toISOString(),
-    budget: 500_000_000,
-    progress: 62,
-    tags: ["fintech", "qr", "vnpay"],
-    description: "Tích hợp thanh toán QR cho web & mobile.",
-    createdAt: dayjs().toISOString(),
-    updatedAt: dayjs().toISOString(),
-  },
-  {
-    id: uid(),
-    code: "PRJ-002",
-    name: "CMS Bệnh viện",
-    owner: "Trần Thị B",
-    status: ProjectStatusEnum.PLANNING,
-    startDate: dayjs().toISOString(),
-    dueDate: dayjs().add(90, "day").toISOString(),
-    budget: 300_000_000,
-    progress: 10,
-    tags: ["healthcare", "backend"],
-    description: "Xây dựng CMS quản lý viện phí.",
-    createdAt: dayjs().toISOString(),
-    updatedAt: dayjs().toISOString(),
-  },
-  {
-    id: uid(),
-    code: "PRJ-003",
-    name: "Data Warehouse v2",
-    owner: "Phạm C",
-    status: ProjectStatusEnum.PAUSED,
-    startDate: dayjs().subtract(120, "day").toISOString(),
-    dueDate: dayjs().add(10, "day").toISOString(),
-    budget: 1_200_000_000,
-    progress: 45,
-    tags: ["data", "etl"],
-    description: "Nâng cấp hệ thống ETL và báo cáo.",
-    createdAt: dayjs().toISOString(),
-    updatedAt: dayjs().toISOString(),
-  },
-];
 
 const ProjectPage: React.FC = () => {
   const { data: projects = [], isFetching, refetch } = useGetProjectsQuery();
   const [createProject, { isLoading: isCreating }] = useCreateProjectMutation();
-  const [data, setData] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [updateProject, { isLoading: isUpdating }] = useUpdateProjectMutation();
+  const [deleteProject, { isLoading: isDeleting }] = useDeleteProjectMutation();
+
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
@@ -91,48 +39,19 @@ const ProjectPage: React.FC = () => {
     [Dayjs | null, Dayjs | null] | null
   >(null);
 
-  // Load data (with seed once if empty)
-  const refresh = () => {
-    setLoading(true);
-    const items = db.read();
-    items.sort(
-      (a, b) => dayjs(b.updatedAt).valueOf() - dayjs(a.updatedAt).valueOf()
-    );
-    setData(items);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    const items = db.read();
-    if (!items || items.length === 0) {
-      // seed lần đầu
-      const seeded = seedData();
-      db.write(seeded);
-    }
-    refresh();
-  }, []);
-
   const openCreate = () => {
     setEditing(null);
     setDrawerOpen(true);
   };
-
   const openEdit = (record: Project) => {
     setEditing(record);
     setDrawerOpen(true);
   };
 
-  // CRUD Handlers
+  // CREATE
   const handleCreate = async (
     vals: Omit<Project, "id" | "createdAt" | "updatedAt">
   ) => {
-    // const created = db.create(vals);
-    // setData((prev) =>
-    //   [created, ...prev].sort(
-    //     (a, b) => dayjs(b.updatedAt).valueOf() - dayjs(a.updatedAt).valueOf()
-    //   )
-    // );
-    console.log("Creating", vals);
     const STR2ENUM: Record<string, ProjectStatusEnum> = {
       planning: ProjectStatusEnum.PLANNING,
       active: ProjectStatusEnum.ACTIVE,
@@ -157,48 +76,43 @@ const ProjectPage: React.FC = () => {
       tags: vals.tags,
       description: vals.description,
     }).unwrap();
+
     setDrawerOpen(false);
     message.success("Tạo dự án thành công");
   };
 
-  const handleUpdate = (
+  // UPDATE
+  const handleUpdate = async (
     vals: Omit<Project, "id" | "createdAt" | "updatedAt">
   ) => {
     if (!editing) return;
-    const updated = db.update(editing.id, vals);
-    if (updated) {
-      setData((prev) => {
-        const idx = prev.findIndex((x) => x.id === updated.id);
-        const next = [...prev];
-        next[idx] = updated;
-        return next.sort(
-          (a, b) => dayjs(b.updatedAt).valueOf() - dayjs(a.updatedAt).valueOf()
-        );
-      });
-      message.success("Cập nhật thành công");
-    }
+    await updateProject({ id: editing.id, body: vals }).unwrap();
     setDrawerOpen(false);
+    setEditing(null);
+    message.success("Cập nhật thành công");
   };
 
-  const handleDelete = (id: string) => {
-    db.remove(id);
-    setData((prev) => prev.filter((x) => x.id !== id));
+  // DELETE (single)
+  const handleDelete = async (id: string) => {
+    await deleteProject(id).unwrap();
     setSelectedRowKeys((ks) => ks.filter((k) => k !== id));
     message.success("Đã xóa dự án");
   };
 
+  // BULK DELETE (dùng Promise.all hoặc làm endpoint bulk ở server)
   const handleBulkDelete = () => {
     if (selectedRowKeys.length === 0) return;
     Modal.confirm({
       title: "Xóa các dự án đã chọn?",
       icon: <ExclamationCircleOutlined />,
       content: "Hành động này không thể hoàn tác",
-      okButtonProps: { danger: true },
+      okButtonProps: { danger: true, loading: isDeleting },
       okText: "Xóa",
       cancelText: "Hủy",
-      onOk: () => {
-        db.bulkRemove(selectedRowKeys as string[]);
-        setData((prev) => prev.filter((x) => !selectedRowKeys.includes(x.id)));
+      onOk: async () => {
+        await Promise.all(
+          (selectedRowKeys as string[]).map((id) => deleteProject(id).unwrap())
+        );
         setSelectedRowKeys([]);
         message.success("Đã xóa các dự án đã chọn");
       },
@@ -209,9 +123,16 @@ const ProjectPage: React.FC = () => {
     exportProjectsCsv(filtered);
   };
 
-  // Derived
+  const refresh = () => {
+    refetch();
+  };
+
+  // Derived (lọc client)
   const filtered = useMemo(() => {
-    let list = [...data];
+    let list = [...projects].sort(
+      (a, b) => dayjs(b.updatedAt).valueOf() - dayjs(a.updatedAt).valueOf()
+    );
+
     if (q.trim()) {
       const t = q.trim().toLowerCase();
       list = list.filter((x) =>
@@ -221,7 +142,7 @@ const ProjectPage: React.FC = () => {
       );
     }
     if (status !== "all") list = list.filter((x) => x.status === status);
-    if (dateRange && dateRange[0] && dateRange[1]) {
+    if (dateRange?.[0] && dateRange?.[1]) {
       const [s, e] = dateRange;
       list = list.filter((x) => {
         const d = dayjs(x.startDate);
@@ -229,7 +150,7 @@ const ProjectPage: React.FC = () => {
       });
     }
     return list;
-  }, [data, q, status, dateRange]);
+  }, [projects, q, status, dateRange]);
 
   const stats = useMemo(() => {
     const total = filtered.length;
@@ -245,6 +166,8 @@ const ProjectPage: React.FC = () => {
     return { total, active, done, avgProgress };
   }, [filtered]);
 
+  console.log("filtered", filtered);
+
   return (
     <div className="p-2 h-full">
       {/* Header */}
@@ -254,8 +177,7 @@ const ProjectPage: React.FC = () => {
             Danh sách Project
           </Typography.Title>
           <Typography.Paragraph className="!mb-0 text-gray-500">
-            Giao diện Next.js + Ant Design + Tailwind. Dữ liệu demo lưu ở
-            LocalStorage.
+            Next.js + Ant Design + Tailwind. Dữ liệu lấy từ API.
           </Typography.Paragraph>
         </div>
         <Space wrap>
@@ -265,9 +187,18 @@ const ProjectPage: React.FC = () => {
             </Button>
           </Tooltip>
           <Tooltip title="Làm mới">
-            <Button icon={<ReloadOutlined />} onClick={refresh} />
+            <Button
+              icon={<ReloadOutlined />}
+              loading={isFetching}
+              onClick={refresh}
+            />
           </Tooltip>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={openCreate}
+            loading={isCreating || isUpdating}
+          >
             Thêm Project
           </Button>
         </Space>
@@ -297,7 +228,7 @@ const ProjectPage: React.FC = () => {
       <Card styles={{ body: { padding: 0 } }}>
         <ProjectTable
           data={filtered}
-          loading={loading}
+          loading={isFetching}
           selectedRowKeys={selectedRowKeys}
           onRowKeysChange={setSelectedRowKeys}
           onEdit={openEdit}

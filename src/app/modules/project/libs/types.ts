@@ -27,7 +27,7 @@ export type Project = {
 export type CustomResponse<T> = {
   status: number;
   message: string;
-  data: T;
+  result: T;
 };
 
 export type ProjectCreateRequest = {
