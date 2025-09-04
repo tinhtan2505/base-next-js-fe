@@ -8,22 +8,8 @@ import type {
   ProjectCreateRequest,
 } from "../libs/types";
 
-/**
- * BE response shape:
- * {
- *   "message": "Thành công",
- *   "result": T,
- *   "metadata": null
- * }
- */
-
-// ---- API slice ----
 export const projectApi = rootApi.injectEndpoints({
   endpoints: (build) => ({
-    /**
-     * GET /api/project/find-all
-     * -> CustomResponse<Project[]>
-     */
     getProjects: build.query<Project[], void>({
       query: () => `/api/project/find-all`,
       transformResponse: (resp: CustomResponse<Project[]>) =>
@@ -37,27 +23,17 @@ export const projectApi = rootApi.injectEndpoints({
           : [{ type: "Projects", id: "LIST" }],
       keepUnusedDataFor: 60,
     }),
-
-    /**
-     * GET /api/project/{id}
-     * -> CustomResponse<Project>
-     */
     getProjectById: build.query<Project, string>({
       query: (id) => `/api/project/${id}`,
       transformResponse: (resp: CustomResponse<Project>) => resp.result,
       providesTags: (_res, _err, id) => [{ type: "Projects", id }],
     }),
 
-    /**
-     * POST /api/project
-     * body: ProjectCreateRequest
-     * -> CustomResponse<Project>
-     *
-     * Có optimistic update: đẩy temp item lên đầu list, sau đó
-     * replace bằng dữ liệu server trả về, và sort theo updatedAt desc.
-     */
     createProject: build.mutation<Project, ProjectCreateRequest>({
-      query: (body) => ({ url: `/api/project`, method: "POST", body }),
+      query: (body) => {
+        console.log("👉 Body gửi lên API:", body);
+        return { url: `/api/project`, method: "POST", body };
+      },
       transformResponse: (resp: CustomResponse<Project>) => resp.result,
       async onQueryStarted(newItem, { dispatch, queryFulfilled }) {
         // Optimistic: chèn temp vào đầu danh sách
@@ -104,22 +80,18 @@ export const projectApi = rootApi.injectEndpoints({
       invalidatesTags: [{ type: "Projects", id: "LIST" }],
     }),
 
-    /**
-     * PUT /api/project/{id}
-     * body: Partial<ProjectCreateRequest>
-     * -> CustomResponse<Project>
-     *
-     * Optimistic patch vào list + sort theo updatedAt desc.
-     */
     updateProject: build.mutation<
       Project,
       { id: string; body: Partial<ProjectCreateRequest> }
     >({
-      query: ({ id, body }) => ({
-        url: `/api/project/${id}`,
-        method: "PUT",
-        body,
-      }),
+      query: ({ id, body }) => {
+        console.log("Body gửi lên API:", body);
+        return {
+          url: `/api/project/${id}`,
+          method: "PUT",
+          body,
+        };
+      },
       transformResponse: (resp: CustomResponse<Project>) => resp.result,
       async onQueryStarted({ id, body }, { dispatch, queryFulfilled }) {
         // Lưu patch để rollback nếu lỗi

@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TTH PAYMENT LISTENER",
-  description: "TTH PAYMENT LISTENER",
+  title: "WEB NQT",
+  description: "WEB NQT",
 };
 
 export default function RootLayout({

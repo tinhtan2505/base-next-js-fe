@@ -54,20 +54,15 @@ export const ProjectTable: React.FC<Props> = ({
         title: "Trạng thái",
         dataIndex: "status",
         render: (v: ProjectStatus) => {
-          const STR2ENUM: Record<string, ProjectStatusEnum> = {
-            planning: ProjectStatusEnum.PLANNING,
-            active: ProjectStatusEnum.ACTIVE,
-            paused: ProjectStatusEnum.PAUSED,
-            done: ProjectStatusEnum.DONE,
-          };
+          const meta = STATUS_META[v as ProjectStatusEnum];
 
-          const key =
-            typeof v === "number"
-              ? v
-              : STR2ENUM[String(v).toLowerCase()] ?? ProjectStatusEnum.PLANNING;
-
-          const meta = STATUS_META[key];
-          return <Tag color={meta?.color}>{meta?.label}</Tag>;
+          return (
+            <span
+              className={`px-2 py-1 rounded-md text-xs font-medium ${meta.bg} ${meta.text}`}
+            >
+              {meta.label}
+            </span>
+          );
         },
       },
       {

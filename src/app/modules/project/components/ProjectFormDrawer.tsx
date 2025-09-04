@@ -23,10 +23,10 @@ interface Props {
 }
 
 const statusOptions = [
-  { value: "planning", label: "Planning" },
-  { value: "active", label: "Active" },
-  { value: "paused", label: "Paused" },
-  { value: "done", label: "Done" },
+  { value: 0, label: "Planning" },
+  { value: 1, label: "Active" },
+  { value: 2, label: "Paused" },
+  { value: 3, label: "Done" },
 ] as const;
 
 const ProjectFormDrawer: React.FC<Props> = ({

@@ -39,7 +39,7 @@ const Login: React.FC<object> = ({}) => {
     <div className="flex justify-center items-center h-screen bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-md w-96">
         <h2 className="text-2xl font-semibold">Welcome back!</h2>
-        <h3 className="text-lg mb-6">Log in to TTH Payment Listener</h3>
+        <h3 className="text-lg mb-6">Log in to WEB NQT</h3>
         <Form
           name="login"
           initialValues={{ remember: true }}

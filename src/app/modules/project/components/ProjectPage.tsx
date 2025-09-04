@@ -166,8 +166,6 @@ const ProjectPage: React.FC = () => {
     return { total, active, done, avgProgress };
   }, [filtered]);
 
-  console.log("filtered", filtered);
-
   return (
     <div className="p-2 h-full">
       {/* Header */}
