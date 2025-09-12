@@ -5,6 +5,7 @@ import "../globals.css";
 import LayoutClient from "./layout-client";
 import AntdReact19Patch from "../AntdReact19Patch";
 import ReduxProvider from "../store/ReduxProvider";
+import RealtimeProvider from "../lib/realtime/RealtimeProvider";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -32,8 +33,10 @@ export default function RootLayout({
         cz-shortcut-listen="true"
       >
         <ReduxProvider>
-          <AntdReact19Patch />
-          <LayoutClient>{children}</LayoutClient>{" "}
+          <RealtimeProvider>
+            <AntdReact19Patch />
+            <LayoutClient>{children}</LayoutClient>
+          </RealtimeProvider>
         </ReduxProvider>
       </body>
     </html>
