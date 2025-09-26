@@ -1,115 +1,135 @@
-// "use client";
-import type {
+"use client";
+import {
   Client,
   IMessage,
-  StompHeaders,
+  IStompSocket,
   StompSubscription,
 } from "@stomp/stompjs";
-import { Client as StompClient } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 
-type ConnectOptions = {
-  url: string; // ví dụ: "/ws" (SockJS endpoint) hoặc "wss://.../ws"
-  useSockJS?: boolean; // Spring dùng SockJS => true
-  getAuthToken?: () => string | undefined; // JWT nếu có
+export type StompStatus =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "disconnected"
+  | "error";
+export type StompTopicHandler = (msg: IMessage) => void;
+
+export interface StompConfig {
+  url: string; // ví dụ: http://localhost:8888/ws (SockJS) hoặc ws://host/ws (thuần WS)
+  useSockJS?: boolean; // Spring thường bật SockJS
+  token?: string | null; // JWT
+  heartbeatIncoming?: number; // ms
+  heartbeatOutgoing?: number; // ms
+  reconnectDelay?: number; // ms (0 = tắt auto reconnect)
+  virtualHost?: string; // cho broker relay (RabbitMQ)
   debug?: boolean;
-};
-
-let client: Client | null = null;
-let connecting = false;
-const subscriptions = new Map<string, StompSubscription>();
-
-function buildHeaders(getAuthToken?: () => string | undefined): StompHeaders {
-  const headers: StompHeaders = {};
-  const token = getAuthToken?.();
-  if (token) headers.Authorization = `Bearer ${token}`; // ✅ không tạo key khi undefined
-  return headers;
 }
 
-export function getStompClient(opts: ConnectOptions): Client {
-  if (client) return client;
+class StompClientManager {
+  private client: Client | null = null;
+  private status: StompStatus = "idle";
+  private pendingSubs: Array<{ dest: string; cb: StompTopicHandler }> = [];
+  private activeSubs: Map<string, StompSubscription> = new Map();
+  private currentCfg?: StompConfig;
 
-  const { url, useSockJS = true, getAuthToken, debug } = opts;
+  getStatus() {
+    return this.status;
+  }
 
-  const c = new StompClient({
-    // SockJS: truyền factory thay vì url WS thuần
-    webSocketFactory: useSockJS ? () => new SockJS(url) : undefined,
-    brokerURL: useSockJS ? undefined : url, // WS thuần (wss://...): dùng brokerURL
-    connectHeaders: buildHeaders(getAuthToken),
-    // Tự động reconnect
-    reconnectDelay: 2000, // ms
-    // Heartbeat
-    heartbeatIncoming: 10000,
-    heartbeatOutgoing: 10000,
-    debug: debug ? (str) => console.log("[STOMP]", str) : undefined,
-    // Gửi lại header khi reconnect
-    beforeConnect: () => {
-      c.connectHeaders = buildHeaders(getAuthToken);
-    },
-    onStompError: (frame) => {
-      console.error("❌ STOMP error:", frame.headers["message"], frame.body);
-    },
-    onWebSocketClose: (evt) => {
-      console.warn("WS closed:", evt?.code, evt?.reason);
-    },
-  });
+  connect(cfg: StompConfig) {
+    const mustRecreate =
+      !this.client || this.currentCfg?.useSockJS !== cfg.useSockJS;
+    this.currentCfg = cfg;
+    const {
+      url,
+      token,
+      useSockJS = true,
+      heartbeatIncoming = 10000,
+      heartbeatOutgoing = 10000,
+      reconnectDelay = 3000,
+      virtualHost,
+      debug,
+    } = cfg;
 
-  client = c;
-  return c;
-}
+    if (mustRecreate) {
+      this.client?.deactivate();
+      this.client = new Client();
+    }
+    if (!this.client) return;
 
-export async function ensureConnected(c: Client): Promise<void> {
-  if (c.connected || connecting) return;
-  connecting = true;
-  try {
-    await new Promise<void>((resolve, reject) => {
-      c.onConnect = () => {
-        connecting = false;
-        resolve();
+    this.status = "connecting";
+    this.client.reconnectDelay = reconnectDelay;
+    this.client.heartbeatIncoming = heartbeatIncoming;
+    this.client.heartbeatOutgoing = heartbeatOutgoing;
+
+    if (useSockJS) {
+      this.client.webSocketFactory = () =>
+        new SockJS(url) as unknown as IStompSocket;
+    } else {
+      this.client.brokerURL = url; // ws:// or wss://
+    }
+
+    this.client.connectHeaders = {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(virtualHost ? { host: virtualHost } : {}),
+    } as Record<string, string>;
+
+    this.client.debug = (msg: string) => {
+      if (debug) console.log("%cSTOMP", "color:#999", msg);
+    };
+
+    this.client.onConnect = () => {
+      this.status = "connected";
+      this.pendingSubs.forEach(({ dest, cb }) => this.subscribe(dest, cb));
+      this.pendingSubs = [];
+    };
+
+    this.client.onStompError = (frame) => {
+      console.error("Broker error", frame.headers["message"], frame.body);
+      this.status = "error";
+    };
+
+    this.client.onWebSocketError = (evt) => {
+      console.error("WS error", evt);
+      this.status = "error";
+    };
+
+    this.client.onDisconnect = () => {
+      this.status = "disconnected";
+    };
+
+    this.client.activate();
+  }
+
+  disconnect() {
+    if (!this.client) return;
+    this.activeSubs.forEach((sub) => sub.unsubscribe());
+    this.activeSubs.clear();
+    this.pendingSubs = [];
+    this.client.deactivate();
+    this.status = "disconnected";
+  }
+
+  subscribe(destination: string, cb: StompTopicHandler): () => void {
+    if (!this.client || this.status !== "connected") {
+      this.pendingSubs.push({ dest: destination, cb });
+      return () => {
+        this.pendingSubs = this.pendingSubs.filter(
+          (p) => !(p.dest === destination && p.cb === cb)
+        );
       };
-      c.onWebSocketError = (e) => {
-        connecting = false;
-        reject(e);
-      };
-      c.activate();
-    });
-  } catch (e) {
-    connecting = false;
-    throw e;
+    }
+    const sub = this.client.subscribe(destination, cb);
+    const key = destination + "#" + Math.random();
+    this.activeSubs.set(key, sub);
+    return () => {
+      try {
+        sub.unsubscribe();
+      } catch {}
+      this.activeSubs.delete(key);
+    };
   }
 }
 
-export function stompSubscribe(
-  c: Client,
-  destination: string,
-  onMessage: (msg: IMessage) => void
-) {
-  const key = destination;
-  if (subscriptions.has(key)) return subscriptions.get(key)!;
-
-  const sub = c.subscribe(destination, onMessage, {});
-  subscriptions.set(key, sub);
-  return sub;
-}
-
-export function stompUnsubscribe(destination: string) {
-  const sub = subscriptions.get(destination);
-  if (sub) {
-    try {
-      sub.unsubscribe();
-    } catch {}
-    subscriptions.delete(destination);
-  }
-}
-
-export function deactivateStomp() {
-  subscriptions.forEach((s) => {
-    try {
-      s.unsubscribe();
-    } catch {}
-  });
-  subscriptions.clear();
-  client?.deactivate();
-  client = null;
-  connecting = false;
-}
+export const stompManager = new StompClientManager();

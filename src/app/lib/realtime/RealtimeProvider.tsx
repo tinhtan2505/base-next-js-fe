@@ -8,7 +8,8 @@ import React, {
   useState,
 } from "react";
 import type { Client } from "@stomp/stompjs";
-import { getStompClient } from "./stompClient";
+import { getStompClient } from "./socketSlice";
+// import { getStompClient } from "./stompClient";
 
 type Ctx = { client: Client | null; connected: boolean };
 const RealtimeCtx = createContext<Ctx>({ client: null, connected: false });
@@ -23,8 +24,18 @@ export default function RealtimeProvider({
 
   const client = useMemo(
     () =>
-      getStompClient(() =>
-        typeof window !== "undefined" ? localStorage.getItem("token") : null
+      getStompClient(
+        () =>
+          typeof window !== "undefined" ? localStorage.getItem("token") : null,
+        {
+          useSockJS: true, // Spring SockJS
+          // url: process.env.NEXT_PUBLIC_WS_URL, // nếu muốn chỉ định
+          virtualHost: process.env.NEXT_PUBLIC_WS_VHOST || undefined,
+          heartbeatIncoming: 10000,
+          heartbeatOutgoing: 10000,
+          reconnectDelay: 3000,
+          debug: false,
+        }
       ),
     []
   );
