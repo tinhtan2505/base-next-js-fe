@@ -1,135 +1,149 @@
+// app/shared/ws/stompClient.ts
 "use client";
-import {
-  Client,
-  IMessage,
-  IStompSocket,
-  StompSubscription,
-} from "@stomp/stompjs";
+
+import { Client, type IStompSocket, type StompHeaders } from "@stomp/stompjs";
+// Nếu gặp vấn đề typings bundler: import SockJS from "sockjs-client/dist/sockjs";
 import SockJS from "sockjs-client";
 
-export type StompStatus =
-  | "idle"
-  | "connecting"
-  | "connected"
-  | "disconnected"
-  | "error";
-export type StompTopicHandler = (msg: IMessage) => void;
-
-export interface StompConfig {
-  url: string; // ví dụ: http://localhost:8888/ws (SockJS) hoặc ws://host/ws (thuần WS)
-  useSockJS?: boolean; // Spring thường bật SockJS
-  token?: string | null; // JWT
+export type GetStompOptions = {
+  useSockJS?: boolean; // default true
+  url?: string; // nếu không truyền sẽ suy ra
+  virtualHost?: string; // cho broker relay
   heartbeatIncoming?: number; // ms
   heartbeatOutgoing?: number; // ms
   reconnectDelay?: number; // ms (0 = tắt auto reconnect)
-  virtualHost?: string; // cho broker relay (RabbitMQ)
-  debug?: boolean;
+  debug?: boolean; // log console
+  beforeConnect?: () => void | Promise<void>;
+};
+
+export type TokenProvider = () => string | null | undefined;
+
+let _client: Client | null = null;
+let _currentOptions: GetStompOptions | undefined;
+let _tokenProvider: TokenProvider | undefined;
+
+function resolveUrl(useSockJS: boolean): string {
+  const envUrl = process.env.NEXT_PUBLIC_WS_URL?.trim();
+  if (envUrl) return envUrl;
+  if (typeof window === "undefined") {
+    return useSockJS ? "http://localhost:8888/ws" : "ws://localhost:8888/ws";
+  }
+  const origin = window.location.origin;
+  return useSockJS ? `${origin}/ws` : origin.replace(/^http/i, "ws") + "/ws";
 }
 
-class StompClientManager {
-  private client: Client | null = null;
-  private status: StompStatus = "idle";
-  private pendingSubs: Array<{ dest: string; cb: StompTopicHandler }> = [];
-  private activeSubs: Map<string, StompSubscription> = new Map();
-  private currentCfg?: StompConfig;
+function buildClient(
+  tokenProvider?: TokenProvider,
+  opts?: GetStompOptions
+): Client {
+  const {
+    useSockJS = true,
+    url = resolveUrl(useSockJS),
+    virtualHost,
+    heartbeatIncoming = 10000,
+    heartbeatOutgoing = 10000,
+    reconnectDelay = 3000,
+    debug = false,
+    beforeConnect,
+  } = opts || {};
 
-  getStatus() {
-    return this.status;
+  const client = new Client();
+
+  if (useSockJS) {
+    client.webSocketFactory = () => new SockJS(url) as unknown as IStompSocket;
+  } else {
+    client.brokerURL = url; // ws:// or wss://
   }
 
-  connect(cfg: StompConfig) {
-    const mustRecreate =
-      !this.client || this.currentCfg?.useSockJS !== cfg.useSockJS;
-    this.currentCfg = cfg;
-    const {
-      url,
-      token,
-      useSockJS = true,
-      heartbeatIncoming = 10000,
-      heartbeatOutgoing = 10000,
-      reconnectDelay = 3000,
-      virtualHost,
-      debug,
-    } = cfg;
+  client.heartbeatIncoming = heartbeatIncoming;
+  client.heartbeatOutgoing = heartbeatOutgoing;
+  client.reconnectDelay = reconnectDelay;
 
-    if (mustRecreate) {
-      this.client?.deactivate();
-      this.client = new Client();
-    }
-    if (!this.client) return;
+  client.debug = (msg: string) => {
+    if (debug) console.log("%cSTOMP", "color:#999", msg);
+  };
 
-    this.status = "connecting";
-    this.client.reconnectDelay = reconnectDelay;
-    this.client.heartbeatIncoming = heartbeatIncoming;
-    this.client.heartbeatOutgoing = heartbeatOutgoing;
+  client.beforeConnect = async () => {
+    if (beforeConnect) await beforeConnect();
+    const token = tokenProvider?.();
+    console.log("STOMP beforeConnect, token:", token);
 
-    if (useSockJS) {
-      this.client.webSocketFactory = () =>
-        new SockJS(url) as unknown as IStompSocket;
-    } else {
-      this.client.brokerURL = url; // ws:// or wss://
-    }
-
-    this.client.connectHeaders = {
+    const headers: StompHeaders = {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(virtualHost ? { host: virtualHost } : {}),
-    } as Record<string, string>;
-
-    this.client.debug = (msg: string) => {
-      if (debug) console.log("%cSTOMP", "color:#999", msg);
     };
+    client.connectHeaders = headers; // luôn là StompHeaders
+  };
 
-    this.client.onConnect = () => {
-      this.status = "connected";
-      this.pendingSubs.forEach(({ dest, cb }) => this.subscribe(dest, cb));
-      this.pendingSubs = [];
-    };
+  client.onStompError = (frame) => {
+    console.error(
+      "[STOMP] Broker error:",
+      frame.headers["message"],
+      frame.body
+    );
+  };
+  client.onWebSocketError = (evt) => {
+    console.error("[STOMP] WS error:", evt);
+  };
 
-    this.client.onStompError = (frame) => {
-      console.error("Broker error", frame.headers["message"], frame.body);
-      this.status = "error";
-    };
-
-    this.client.onWebSocketError = (evt) => {
-      console.error("WS error", evt);
-      this.status = "error";
-    };
-
-    this.client.onDisconnect = () => {
-      this.status = "disconnected";
-    };
-
-    this.client.activate();
-  }
-
-  disconnect() {
-    if (!this.client) return;
-    this.activeSubs.forEach((sub) => sub.unsubscribe());
-    this.activeSubs.clear();
-    this.pendingSubs = [];
-    this.client.deactivate();
-    this.status = "disconnected";
-  }
-
-  subscribe(destination: string, cb: StompTopicHandler): () => void {
-    if (!this.client || this.status !== "connected") {
-      this.pendingSubs.push({ dest: destination, cb });
-      return () => {
-        this.pendingSubs = this.pendingSubs.filter(
-          (p) => !(p.dest === destination && p.cb === cb)
-        );
-      };
-    }
-    const sub = this.client.subscribe(destination, cb);
-    const key = destination + "#" + Math.random();
-    this.activeSubs.set(key, sub);
-    return () => {
-      try {
-        sub.unsubscribe();
-      } catch {}
-      this.activeSubs.delete(key);
-    };
-  }
+  return client;
 }
 
-export const stompManager = new StompClientManager();
+/** Singleton factory */
+export function getStompClient(
+  tokenProvider?: TokenProvider,
+  options?: GetStompOptions
+): Client {
+  const nextUseSockJS = options?.useSockJS ?? true;
+  const prevUseSockJS = _currentOptions?.useSockJS ?? true;
+  const prevUrl = _currentOptions?.url;
+
+  console.log("tokenProvider - useSockJS:", tokenProvider);
+
+  const nextOptions: GetStompOptions = {
+    useSockJS: nextUseSockJS,
+    url: options?.url ?? resolveUrl(nextUseSockJS),
+    virtualHost: options?.virtualHost,
+    heartbeatIncoming: options?.heartbeatIncoming ?? 10000,
+    heartbeatOutgoing: options?.heartbeatOutgoing ?? 10000,
+    reconnectDelay: options?.reconnectDelay ?? 3000,
+    debug: options?.debug ?? false,
+    beforeConnect: options?.beforeConnect,
+  };
+
+  const needRebuild =
+    !_client ||
+    nextUseSockJS !== prevUseSockJS ||
+    (!!prevUrl && nextOptions.url !== prevUrl);
+
+  _tokenProvider = tokenProvider;
+  _currentOptions = nextOptions;
+
+  if (needRebuild) {
+    try {
+      _client?.deactivate();
+    } catch {}
+    _client = buildClient(_tokenProvider, _currentOptions);
+  } else if (_client) {
+    _client.heartbeatIncoming = _currentOptions.heartbeatIncoming!;
+    _client.heartbeatOutgoing = _currentOptions.heartbeatOutgoing!;
+    _client.reconnectDelay = _currentOptions.reconnectDelay!;
+    _client.debug = (msg: string) => {
+      if (_currentOptions?.debug) console.log("%cSTOMP", "color:#999", msg);
+    };
+    _client.beforeConnect = async () => {
+      if (_currentOptions?.beforeConnect) await _currentOptions.beforeConnect();
+      const token = _tokenProvider?.();
+      const headers: StompHeaders = {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(_currentOptions?.virtualHost
+          ? { host: _currentOptions.virtualHost }
+          : {}),
+      };
+      _client!.connectHeaders = headers;
+    };
+  }
+
+  if (_client && !_client.active) _client.activate();
+  return _client!;
+}
