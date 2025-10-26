@@ -1,10 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
-import {
-  HomeOutlined,
-  BankOutlined,
-  FolderOutlined,
-  FileTextOutlined,
-} from "@ant-design/icons";
+import { HomeOutlined, FolderOutlined } from "@ant-design/icons";
 
 // Lấy đúng kiểu props của icon Ant Design
 type IconProps = React.ComponentProps<typeof HomeOutlined>;
@@ -21,21 +16,6 @@ export type AppMenuItem = {
 
 export const MENU: AppMenuItem[] = [
   { key: "/", label: "Home", icon: HomeOutlined },
-  {
-    key: "/payment-listener",
-    label: "Payment",
-    icon: BankOutlined,
-    children: [
-      {
-        key: "/payment-listener/all",
-        label: "Dashboard",
-        icon: FileTextOutlined,
-        exact: true,
-      },
-      { key: "/payment-listener/transactions", label: "Transactions" },
-      { key: "/payment-listener/settings", label: "Settings" },
-    ],
-  },
   {
     key: "/project",
     label: "Project",
